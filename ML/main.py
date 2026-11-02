@@ -1,34 +1,51 @@
 import os
 import numpy as np
 import pandas as pd
+import seaborn as sns
 import matplotlib.pyplot as plt
+
 from skimage.io import imread
 from skimage.measure import regionprops
 from skimage.filters import threshold_otsu
 from skimage.color import rgb2gray
 from skimage.feature import graycomatrix, graycoprops
+
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import make_pipeline
-from sklearn.metrics import balanced_accuracy_score, f1_score, confusion_matrix, ConfusionMatrixDisplay
+from sklearn.metrics import (
+    balanced_accuracy_score,
+    f1_score,
+    confusion_matrix,
+    ConfusionMatrixDisplay,
+    classification_report
+)
 
-# check and load data
+
+# loading data and extracting features
+classes = [
+    'basophil', 'eosinophil', 'erythroblast', 'ig',
+    'lymphocyte', 'monocyte', 'neutrophil', 'platelet'
+]
+
+feature_labels = [
+    'cell_area', 'cell_diameter', 'nucleus_area', 'nucleus_diameter',
+    'solidity', 'eccentricity', 'circularity', 'nc_ratio',
+    'nucleus_r', 'nucleus_g', 'nucleus_b',
+    'cytoplasm_r', 'cytoplasm_g', 'cytoplasm_b',
+    'glcm_contrast', 'glcm_homogeneity', 'glcm_energy', 'technical_flag'
+]
+
 if not os.path.exists("pbc_features_18.npy"):
-    print("extracting 18 features for the first time, please wait...")
+    print("extracting 18 features...")
 
     data_path = "/Users/marysianowakowska/politechnika/5 semestrer/intro to ML/project/ML/PBC_dataset_normal_DIB"
-
-    classes = [
-        'basophil', 'eosinophil', 'erythroblast', 'ig',
-        'lymphocyte', 'monocyte', 'neutrophil', 'platelet'
-    ]
 
     images = []
     labels = []
 
-    for id, cls in enumerate(classes):
+    for idx, cls in enumerate(classes):
         folder = os.path.join(data_path, cls)
 
         if not os.path.isdir(folder):
@@ -41,7 +58,7 @@ if not os.path.exists("pbc_features_18.npy"):
                 try:
                     img = imread(img_path)
                     images.append(img)
-                    labels.append(id)
+                    labels.append(idx)
                 except Exception as e:
                     print(f"error loading {file}: {e}")
 
@@ -51,7 +68,7 @@ if not os.path.exists("pbc_features_18.npy"):
 
     features_list = []
 
-    for id, img in enumerate(x_data):
+    for idx, img in enumerate(x_data):
         gray_img = rgb2gray(img)
 
         thresh = threshold_otsu(gray_img)
@@ -114,52 +131,73 @@ if not os.path.exists("pbc_features_18.npy"):
     np.save("pbc_features_18.npy", x_features)
     np.save("pbc_labels.npy", y_data)
 
-# load saved features and labels
+
+# analysing the dataset
 x_features = np.load("pbc_features_18.npy")
 y_data = np.load("pbc_labels.npy")
 
-# split into train and test sets (80% / 20%)
-x_train, x_test, y_train, y_test = train_test_split(
-    x_features, y_data, test_size=0.2, random_state=42
+print("shape of data: {}".format(x_features.shape))
+print("shape of labels: {}".format(y_data.shape))
+
+
+# data lookup
+data = pd.DataFrame(x_features, columns=feature_labels)
+print("\nfirst 5 rows of the dataset:")
+print(data.head(5))
+
+
+# class distrib
+labels_series = pd.Series(y_data).map(lambda x: classes[x])
+print("\nclass distribution:")
+print(labels_series.value_counts(normalize=False))
+
+# correlation matrix
+plt.figure(figsize=(14, 12))
+sns.heatmap(data.drop(columns=['technical_flag']).corr(), annot=True, fmt=".2f", cmap="coolwarm")
+plt.title("feature correlation matrix")
+plt.tight_layout()
+plt.show()
+
+
+# splitting the dataset into test and train data (18 features)
+X_train, X_test, y_train, y_test = train_test_split(
+    x_features, y_data, test_size=0.2, random_state=42, stratify=y_data
 )
 
+print("X_train shape: {}".format(X_train.shape))
+print("y_train shape: {}".format(y_train.shape))
+print("X_test shape: {}".format(X_test.shape))
+print("y_test shape: {}".format(y_test.shape))
 
-# train initial model (random forest) for feature importance
 
+# initial model (random forest) for feature importance
 rf_model = RandomForestClassifier(n_estimators=100, random_state=42)
-rf_model.fit(x_train, y_train)
+rf_model.fit(X_train, y_train)
 
-y_pred = rf_model.predict(x_test)
-print(f"balanced accuracy (all 18 features): {balanced_accuracy_score(y_test, y_pred):.4f}")
-print(f"macro-f1 (all 18 features): {f1_score(y_test, y_pred, average='macro'):.4f}")
+y_pred_rf = rf_model.predict(X_test)
+print("\nrandom forest (all 18 features)")
+print(f"balanced accuracy: {balanced_accuracy_score(y_test, y_pred_rf):.4f}")
+print(f"macro-F1: {f1_score(y_test, y_pred_rf, average='macro'):.4f}")
+print("\nclassification report (random forest):")
+print(classification_report(y_test, y_pred_rf, target_names=classes))
+
 
 # feature importance ranking
 importances = rf_model.feature_importances_
-feature_labels = [
-    'cell_area', 'cell_diameter', 'nucleus_area', 'nucleus_diameter',
-    'solidity', 'eccentricity', 'circularity', 'nc_ratio',
-    'nucleus_r', 'nucleus_g', 'nucleus_b',
-    'cytoplasm_r', 'cytoplasm_g', 'cytoplasm_b',
-    'glcm_contrast', 'glcm_homogeneity', 'glcm_energy', 'technical_flag'
-]
-
 ranking = pd.DataFrame({'feature': feature_labels, 'importance': importances})
 ranking = ranking.sort_values(by='importance', ascending=False)
 
-# feature importance plot
 plt.figure(figsize=(10, 6))
 plt.barh(ranking['feature'], ranking['importance'], color='steelblue')
 plt.gca().invert_yaxis()
 plt.xlabel('importance')
 plt.ylabel('feature')
-plt.title('feature importance ranking')
+plt.title('feature importance ranking (random forest)')
 plt.tight_layout()
 plt.show()
 
 
 # feature selection (reduce to 13 features)
-
-df = pd.DataFrame(x_features, columns=feature_labels)
 drop_cols = [
     'technical_flag',
     'nucleus_diameter',
@@ -168,33 +206,40 @@ drop_cols = [
     'glcm_homogeneity'
 ]
 
-x_selected = df.drop(columns=drop_cols).values
+data_selected = data.drop(columns=drop_cols)
+print("shape of selected data: {}".format(data_selected.shape))
 
-x_train_sel, x_test_sel, y_train, y_test = train_test_split(
-    x_selected, y_data, test_size=0.2, random_state=42
+
+# normalization of data
+scaler = StandardScaler()
+scaler.fit(data_selected)
+x_selected_scaled = scaler.transform(data_selected)
+
+X_train_sel, X_test_sel, y_train, y_test = train_test_split(
+    x_selected_scaled, y_data, test_size=0.2, random_state=42, stratify=y_data
 )
 
 
-# svm model on 13 features
+# SVM model on 13 features
+svm_model = SVC(kernel='rbf', random_state=42)
+svm_model.fit(X_train_sel, y_train)
+y_pred_svm = svm_model.predict(X_test_sel)
 
-class_names = [
-    'basophil', 'eosinophil', 'erythroblast', 'ig',
-    'lymphocyte', 'monocyte', 'neutrophil', 'platelet'
-]
-
-svm_model = make_pipeline(StandardScaler(), SVC(kernel='rbf', random_state=42))
-svm_model.fit(x_train_sel, y_train)
-y_pred_svm = svm_model.predict(x_test_sel)
-
-print("\n--- svm (13 selected features) ---")
+print("\nSVM (13 selected features)")
 print(f"balanced accuracy: {balanced_accuracy_score(y_test, y_pred_svm):.4f}")
-print(f"macro-f1: {f1_score(y_test, y_pred_svm, average='macro'):.4f}")
+print(f"macro-F1: {f1_score(y_test, y_pred_svm, average='macro'):.4f}")
 
-# confusion matrix for svm with 13 features (fixed empty plot issue)
-cm = confusion_matrix(y_test, y_pred_svm)
+
+# classification report (SVM - 13 features)
+print("\nclassification report (SVM - 13 features):")
+print(classification_report(y_test, y_pred_svm, target_names=classes))
+
+
+# assess results - confusion matrix
+cm = confusion_matrix(np.asarray(y_test), np.asarray(y_pred_svm))
 fig, ax = plt.subplots(figsize=(10, 8))
-disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=class_names)
+disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=classes)
 disp.plot(cmap=plt.cm.Blues, xticks_rotation='vertical', ax=ax)
-plt.title('confusion matrix - svm (13 features)')
+plt.title('confusion matrix - SVM (13 features)')
 plt.tight_layout()
 plt.show()
