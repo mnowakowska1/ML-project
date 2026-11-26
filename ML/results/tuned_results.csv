@@ -1,0 +1,7 @@
+model,best cv macro-f1,holdout balanced accuracy,holdout macro-f1,best params
+SVM (Tuned),0.9194167555334113,0.9229810261024926,0.9253907091999776,"{'model__C': 50, 'model__class_weight': None, 'model__gamma': 0.05}"
+SVM (Fine-Tuned),0.9194167555334113,0.9229810261024926,0.9253907091999776,"{'model__C': 50, 'model__gamma': 0.05}"
+Stacking Ensemble (SVM+HGB+RF),,0.9213070898535434,0.9242196061565011,meta: scaled logistic regression
+Voting Ensemble (SVM+HGB+RF),,0.9166514749157391,0.9221071321055831,hard voting
+HistGradientBoosting (Tuned),0.9035635973695209,0.9120758579835404,0.916259774151582,"{'model__l2_regularization': 0.0, 'model__learning_rate': 0.05, 'model__max_depth': None, 'model__max_iter': 200}"
+Random Forest (Tuned),0.8967832436231143,0.8964694641016259,0.9049683251864784,"{'model__class_weight': None, 'model__max_depth': None, 'model__min_samples_leaf': 1, 'model__n_estimators': 400}"

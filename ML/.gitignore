@@ -1,0 +1,9 @@
+# dataset images
+PBC_dataset_normal_DIB/
+
+# cached features and labels
+*.npy
+
+# python and system files
+__pycache__/
+.DS_Store
