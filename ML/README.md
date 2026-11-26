@@ -1,8 +1,5 @@
 # blood cell classification with classical machine learning
 
-Introduction to Machine Learning project, Lodz University of Technology (Modelling and Data Science).
-Authors: Maria Nowakowska and Alicja Pietrzak.
-
 We classify microscopic blood cell images from the PBC dataset into eight classes
 (basophil, eosinophil, erythroblast, ig, lymphocyte, monocyte, neutrophil, platelet)
 using handcrafted morphological, color and texture features and classical machine learning models.
